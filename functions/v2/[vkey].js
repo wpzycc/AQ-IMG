@@ -6,14 +6,17 @@ export async function onRequestGet({ request }) {
   const isWhitelisted = ['p.wpzy.cc', 'y.wpzy.cc', 'wpzy.cc'].some(d => referer.includes(d));
 
   if (isWhitelisted) {
-    const filename = newUrl.pathname.replace(/^\/v2\//, '');
-    // 这里使用你的新域名和 3333 端口
-    const defaultUrl = `http://proxy.wpzy.cc/${filename}`; 
+    // ⚠️ 核心修改：保留完整的 /v2/ 路径
+    let filename = newUrl.pathname; 
+    // 如果你的服务器不需要 /v2/，就把上面那行改成：let filename = newUrl.pathname.replace(/^\/v2\//, '');
+
+    // ⚠️ 核心修改：使用 HTTPS 协议，绝对不要用 HTTP，否则 Cloudflare 直接拦
+    const defaultUrl = `https://proxy.wpzy.cc${filename}`; 
     const basicAuth = 'Basic ' + btoa('youtairen:yuyu197917');
 
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 2500); // 2.5 秒超时
+      const timer = setTimeout(() => controller.abort(), 2500); 
       
       const res = await fetch(defaultUrl, {
         headers: { 
@@ -27,18 +30,19 @@ export async function onRequestGet({ request }) {
 
       if (res.ok) return res;
       
+      // 直接暴露错误方便排查
+      return new Response(`自建服务器返回错误代码: ${res.status}`, { status: 502 });
+      
     } catch (e) {
-      // 这里把错误信息输出到图片，方便你排查（比如看到 502 还是超时）
-      // 如果你确认没问题，可以把这行删掉，让它静默走兜底
-      return new Response(`自建服务器请求失败: ${e.message}`, { status: 502 });
+      return new Response(`fetch报错: ${e.name} - ${e.message}`, { status: 502 });
     }
   }
 
-  // 兜底逻辑：走 WP CDN
+  // 兜底逻辑
   return fetch(`https://i${Math.floor(Math.random() * 4)}.wp.com/${newUrl.hostname}${newUrl.pathname.replace('/v2', 'vh-img-proxy')}${newUrl.search}`, {
     headers: {
       'referer': 'https://www.vhimg.com',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      'User-Agent': 'Mozilla/5.0'
     }
   });
 }
