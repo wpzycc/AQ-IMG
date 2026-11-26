@@ -8,7 +8,7 @@ export async function onRequestGet({ request }) {
   if (isWhitelisted) {
     const filename = newUrl.pathname.replace(/^\/v2\//, '');
     // 这里使用你的新域名和 3333 端口
-    const defaultUrl = `http://proxy.wpzy.cc:3333/${filename}`; 
+    const defaultUrl = `http://proxy.wpzy.cc/${filename}`; 
     const basicAuth = 'Basic ' + btoa('youtairen:yuyu197917');
 
     try {
