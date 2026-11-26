@@ -1,53 +1,44 @@
-export async function onRequestGet({ request, env }) {
-  const { url, method, headers, body } = request;
+export async function onRequestGet({ request }) {
+  const { url } = request;
   const newUrl = new URL(url);
-  const referer = headers.get('Referer') || headers.get('Origin') || '';
+  const referer = request.headers.get('Referer') || '';
   
-  // 1. 白名单判断
-  const allowedOrigins = ['p.wpzy.cc', 'y.wpzy.cc', 'wpzy.cc'];
-  const isWhitelisted = allowedOrigins.some(domain => referer.includes(domain));
+  const isWhitelisted = ['p.wpzy.cc', 'y.wpzy.cc', 'wpzy.cc'].some(d => referer.includes(d));
 
-  // 2. 白名单逻辑：走自建服务器
   if (isWhitelisted) {
-    const serverIP = env?.DEFAULT_SERVER_IP || '103.178.56.182';
-    const serverPort = env?.DEFAULT_SERVER_PORT || '3333';
-    const user = env?.DEFAULT_USER || 'youtairen';
-    const pass = env?.DEFAULT_PASS || 'yuyu197917';
-    
-    // 提取文件名 (比如 /v2/e2kqwUB.jpeg 变成 e2kqwUB.jpeg)
     const filename = newUrl.pathname.replace(/^\/v2\//, '');
-    const defaultUrl = `http://${serverIP}:${serverPort}/${filename}`;
-    const basicAuth = 'Basic ' + btoa(`${user}:${pass}`);
+    // 这里使用你的新域名和 3333 端口
+    const defaultUrl = `http://proxy.wpzy.cc:3333/${filename}`; 
+    const basicAuth = 'Basic ' + btoa('youtairen:yuyu197917');
 
     try {
-      // 尝试请求你的自建服务器（设置 3 秒超时）
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 3000);
+      const timer = setTimeout(() => controller.abort(), 2500); // 2.5 秒超时
       
       const res = await fetch(defaultUrl, {
-        method,
-        headers: { ...headers, 'Authorization': basicAuth },
+        headers: { 
+            'Authorization': basicAuth, 
+            'Accept': 'image/*',
+            'User-Agent': 'Mozilla/5.0'
+        },
         signal: controller.signal
       });
       clearTimeout(timer);
-      
-      // 如果自建服务器正常返回，直接结束
+
       if (res.ok) return res;
-      throw new Error(`Self-hosted status: ${res.status}`);
-    } catch (error) {
-      // 如果自建挂了或超时，不报错，继续往下走 WP 兜底
-      console.warn('自建服务器失败，切换 WP CDN 兜底:', error.message);
+      
+    } catch (e) {
+      // 这里把错误信息输出到图片，方便你排查（比如看到 502 还是超时）
+      // 如果你确认没问题，可以把这行删掉，让它静默走兜底
+      return new Response(`自建服务器请求失败: ${e.message}`, { status: 502 });
     }
   }
 
-  // 3. 兜底逻辑：不在白名单，或者自建挂了，走你原来的 WP CDN 逻辑
+  // 兜底逻辑：走 WP CDN
   return fetch(`https://i${Math.floor(Math.random() * 4)}.wp.com/${newUrl.hostname}${newUrl.pathname.replace('/v2', 'vh-img-proxy')}${newUrl.search}`, {
-    method,
     headers: {
-      ...headers,
-      referer: 'https://www.vhimg.com',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
-    },
-    body
+      'referer': 'https://www.vhimg.com',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
   });
 }
